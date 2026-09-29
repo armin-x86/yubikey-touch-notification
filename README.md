@@ -61,7 +61,7 @@ open -e ~/.config/yubikey-touch-notification/config
 SOUND="/System/Library/Sounds/Submarine.aiff"   # "" = no sound
 VOICE="Whisper"                                  # "" = system default voice
 TEXT="touch"                                     # "" = no speech
-COOLDOWN=3                                       # seconds between alerts
+COOLDOWN=5                                       # seconds between alerts
 ```
 
 Changes apply on the next touch request. **No restart is needed.** To hear your change right away:
@@ -125,6 +125,48 @@ tail -f ~/Library/Logs/yubikey-touch-notification.log
 
 To update, run the install command again. Your config is kept.
 
+### Restart after changing the script
+
+Config edits need no restart. If you edit `~/.local/bin/yubikey-touch-notify` itself, restart the service so the running copy picks it up:
+
+```sh
+launchctl kickstart -k gui/$(id -u)/io.github.armin-x86.yubikey-touch-notification
+```
+
+Then confirm the new process started just now:
+
+```sh
+ps -axo pid,lstart,command | grep '[y]ubikey-touch-notify'
+```
+
+### Make sure only one notifier is running
+
+If you had your own YubiKey touch script before, it may still run as a separate LaunchAgent. You then hear two alerts per touch, and changes to this project seem to have no effect. Check before and after installing:
+
+```sh
+# Every yknotify process and its parent. Expect exactly one, under yubikey-touch-notify.
+ps -axo pid,ppid,lstart,command | grep '[y]knotify'
+
+# Every loaded LaunchAgent that looks like a YubiKey notifier. Expect only
+# io.github.armin-x86.yubikey-touch-notification.
+launchctl list | grep -i -E 'yubi|yknotify'
+
+# LaunchAgent files that start yknotify or a YubiKey script.
+grep -l -i -E 'yubi|yknotify' ~/Library/LaunchAgents/*.plist
+```
+
+To look up what an unknown process belongs to, pass its parent PID to `ps -o pid,ppid,command -p <PPID>`.
+
+Stop and disable any other agent so it does not come back at login:
+
+```sh
+OTHER=com.example.old-yubikey-agent   # label from launchctl list
+launchctl bootout gui/$(id -u)/$OTHER
+launchctl disable gui/$(id -u)/$OTHER
+```
+
+To undo that, run `launchctl enable gui/$(id -u)/$OTHER` and then `launchctl bootstrap gui/$(id -u) <path to its plist>`. You can also delete its plist from `~/Library/LaunchAgents` if you no longer need it.
+
 ## Uninstall
 
 ```sh
@@ -142,7 +184,10 @@ Check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If noth
 Your OpenPGP touch policy may be off. Check it with `ykman openpgp info`. To require a touch for SSH authentication, run `ykman openpgp keys set-touch aut on`.
 
 **Two alerts per touch.**
-Another copy of yknotify is running, for example a manual run in a terminal. Find it with `pgrep -fl yknotify`.
+Another copy of yknotify is running. It may be a manual run in a terminal or an older LaunchAgent. See [Make sure only one notifier is running](#make-sure-only-one-notifier-is-running).
+
+**Config or script changes seem to have no effect.**
+The alert you hear may come from a different notifier. Run the checks in [Make sure only one notifier is running](#make-sure-only-one-notifier-is-running).
 
 **An occasional alert with no touch request.**
 yknotify detects touch requests from macOS log messages. It can sometimes misread one. A macOS update could also change those messages and break detection. If that happens, check [yknotify](https://github.com/noperator/yknotify) for a fix.

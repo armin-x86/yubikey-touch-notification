@@ -9,7 +9,7 @@ load_config() {
   SOUND="/System/Library/Sounds/Submarine.aiff"
   VOICE="Whisper"
   TEXT="touch"
-  COOLDOWN=3
+  COOLDOWN=5
   # shellcheck source=/dev/null
   [[ -r "$CONFIG" ]] && source "$CONFIG"
 }
