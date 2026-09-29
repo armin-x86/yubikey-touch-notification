@@ -1,0 +1,17 @@
+# yubikey-touch-notification config
+# Edits apply on the next touch request. No restart needed.
+# Test your changes with: ~/.local/bin/yubikey-touch-notify --test
+
+# Sound played first. Any .aiff, .wav or .mp3 file. Set to "" for no sound.
+# Built-in sounds: ls /System/Library/Sounds
+SOUND="/System/Library/Sounds/Submarine.aiff"
+
+# macOS voice used to speak TEXT. Set to "" for the system default voice.
+# List voices: say -v '?'
+VOICE="Whisper"
+
+# Text spoken after the sound. Set to "" for no speech.
+TEXT="touch"
+
+# Minimum seconds between two alerts.
+COOLDOWN=3

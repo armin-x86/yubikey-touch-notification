@@ -1,0 +1,60 @@
+#!/bin/bash
+# Plays an alert whenever the YubiKey is waiting for a touch.
+# Detection comes from yknotify, which watches the macOS unified log.
+
+CONFIG="${YUBIKEY_TOUCH_CONFIG:-$HOME/.config/yubikey-touch-notification/config}"
+YKNOTIFY="${YKNOTIFY:-$HOME/.local/bin/yknotify}"
+
+load_config() {
+  SOUND="/System/Library/Sounds/Submarine.aiff"
+  VOICE="Whisper"
+  TEXT="touch"
+  COOLDOWN=3
+  # shellcheck source=/dev/null
+  [[ -r "$CONFIG" ]] && source "$CONFIG"
+}
+
+alert() {
+  if [[ -n "$SOUND" ]]; then
+    /usr/bin/afplay "$SOUND"
+  fi
+  if [[ -n "$TEXT" ]]; then
+    if [[ -n "$VOICE" ]]; then
+      /usr/bin/say -v "$VOICE" "$TEXT"
+    else
+      /usr/bin/say "$TEXT"
+    fi
+  fi
+}
+
+case "${1:-}" in
+  --test)
+    load_config
+    alert
+    exit
+    ;;
+  -h|--help)
+    echo "Usage: yubikey-touch-notify [--test]"
+    echo "  (no args)  watch for YubiKey touch requests and alert"
+    echo "  --test     play the configured alert once"
+    echo "Config: $CONFIG"
+    exit
+    ;;
+esac
+
+if [[ ! -x "$YKNOTIFY" ]]; then
+  echo "yknotify not found at $YKNOTIFY" >&2
+  exit 1
+fi
+
+last=0
+"$YKNOTIFY" | while read -r event; do
+  # Reloaded on every event so config edits apply without a restart.
+  load_config
+  now=$(date +%s)
+  if (( now - last >= COOLDOWN )); then
+    last=$now
+    echo "$(date '+%F %T') $event"
+    alert >/dev/null 2>&1 &
+  fi
+done
