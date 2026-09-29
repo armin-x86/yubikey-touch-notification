@@ -14,4 +14,4 @@ VOICE="Whisper"
 TEXT="touch"
 
 # Minimum seconds between two alerts.
-COOLDOWN=3
+COOLDOWN=5
