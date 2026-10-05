@@ -7,7 +7,7 @@ It works for any YubiKey touch request that macOS logs:
 - **OpenPGP** (for example SSH through `gpg-agent`, `git` commit signing, `gpg --decrypt`)
 - **FIDO2 / WebAuthn** (for example `ssh` with `ed25519-sk` keys, browser security-key prompts)
 
-By default you hear the macOS "Submarine" sound followed by a whispered "touch".
+By default you hear the macOS "Submarine" sound followed by a whispered "touch" once the key has blinked 3 times without a touch.
 
 ## Install
 
@@ -36,7 +36,7 @@ macOS unified log ──> yknotify ──> yubikey-touch-notify ──> afplay +
 ```
 
 1. [yknotify](https://github.com/noperator/yknotify) streams the macOS system log and prints a line when a YubiKey starts waiting for a touch.
-2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. So the notifier alerts right away, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`.
+2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. The notifier counts those lines as blinks. It alerts on blink `BLINKS_BEFORE_ALERT`, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`. Touch the key before that and you hear nothing.
 3. A per-user LaunchAgent keeps it running. It starts at login and restarts if it ever exits.
 
 Safety limits keep it quiet and light when something goes wrong:
@@ -68,6 +68,7 @@ VOICE="Whisper"                                  # "" = system default voice
 TEXT="touch"                                     # "" = no speech
 COOLDOWN=5                                       # seconds between repeated alerts
 MAX_ALERTS=3                                     # most alerts per touch request
+BLINKS_BEFORE_ALERT=3                            # blinks before the first alert, 1 = at once
 ```
 
 Changes apply on the next touch request. **No restart is needed.** To hear your change right away:

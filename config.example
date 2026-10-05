@@ -18,3 +18,7 @@ COOLDOWN=5
 
 # Most alerts played for one touch request.
 MAX_ALERTS=3
+
+# Wait until the key has blinked this many times without a touch before the
+# first alert. The key blinks about once per second. Set to 1 to alert at once.
+BLINKS_BEFORE_ALERT=3

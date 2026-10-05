@@ -21,6 +21,7 @@ load_config() {
   TEXT="touch"
   COOLDOWN=5
   MAX_ALERTS=3
+  BLINKS_BEFORE_ALERT=3
   # shellcheck source=/dev/null
   [[ -r "$CONFIG" ]] && source "$CONFIG"
 }
@@ -86,6 +87,7 @@ last_event=-1000
 request_start=0
 last_alert=0
 alerts=0
+blinks=0
 
 while read -r event; do
   # Reloaded on every event so config edits apply without a restart.
@@ -95,14 +97,18 @@ while read -r event; do
   if (( now - last_event > EVENT_GAP )); then
     request_start=$now
     alerts=0
+    blinks=0
     log "touch requested $event"
   fi
   last_event=$now
+  blinks=$((blinks + 1))
 
   if (( now - request_start >= STUCK_AFTER )); then
     log "yknotify reported a touch for ${STUCK_AFTER}s straight, restarting it"
     exit 75
   fi
+
+  (( blinks < BLINKS_BEFORE_ALERT )) && continue
 
   if (( alerts == 0 || (alerts < MAX_ALERTS && now - last_alert >= COOLDOWN) )); then
     alerts=$((alerts + 1))
