@@ -1,6 +1,6 @@
 # yubikey-touch-notification
 
-**macOS only.** Plays a sound and speaks a word whenever your YubiKey is waiting for a touch, so you never miss the blinking key.
+**macOS only.** Plays a sound and speaks a word when your YubiKey keeps waiting for a touch, so you never miss the blinking key.
 
 It works for any YubiKey touch request that macOS logs:
 
@@ -185,7 +185,7 @@ Your config is kept. To remove it too, run `./uninstall.sh --purge` from a clone
 ## Troubleshooting
 
 **No alert when the key blinks.**
-Check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
+The first alert comes on the 3rd blink. If you touch the key sooner, silence is expected. Set `BLINKS_BEFORE_ALERT=1` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
 
 **The key never asks for a touch.**
 Your OpenPGP touch policy may be off. Check it with `ykman openpgp info`. To require a touch for SSH authentication, run `ykman openpgp keys set-touch aut on`.
