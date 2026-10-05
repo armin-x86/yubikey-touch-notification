@@ -1,13 +1,13 @@
 # yubikey-touch-notification
 
-**macOS only.** Plays a sound and speaks a word whenever your YubiKey is waiting for a touch, so you never miss the blinking key.
+**macOS only.** Plays a sound and speaks a word when your YubiKey keeps waiting for a touch, so you never miss the blinking key.
 
 It works for any YubiKey touch request that macOS logs:
 
 - **OpenPGP** (for example SSH through `gpg-agent`, `git` commit signing, `gpg --decrypt`)
 - **FIDO2 / WebAuthn** (for example `ssh` with `ed25519-sk` keys, browser security-key prompts)
 
-By default you hear the macOS "Submarine" sound followed by a whispered "touch".
+By default you hear the macOS "Submarine" sound followed by a whispered "touch" once the key has blinked 3 times without a touch.
 
 ## Install
 
@@ -36,8 +36,13 @@ macOS unified log ──> yknotify ──> yubikey-touch-notify ──> afplay +
 ```
 
 1. [yknotify](https://github.com/noperator/yknotify) streams the macOS system log and prints a line when a YubiKey starts waiting for a touch.
-2. `yubikey-touch-notify` reads those lines and plays your sound and voice. It waits `COOLDOWN` seconds between alerts so one touch gives one alert.
+2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. The notifier counts those lines as blinks. It alerts on blink `BLINKS_BEFORE_ALERT`, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`. Touch the key before that and you hear nothing.
 3. A per-user LaunchAgent keeps it running. It starts at login and restarts if it ever exits.
+
+Safety limits keep it quiet and light when something goes wrong:
+
+- Only one alert plays at a time. Each `afplay` or `say` is killed after 10 seconds, so hung audio can never pile up.
+- yknotify can get stuck reporting a touch that is long over. If it reports one for 60 seconds straight, the notifier exits and launchd restarts it with a clean state.
 
 No root access is needed. Everything is installed in your home folder:
 
@@ -61,7 +66,9 @@ open -e ~/.config/yubikey-touch-notification/config
 SOUND="/System/Library/Sounds/Submarine.aiff"   # "" = no sound
 VOICE="Whisper"                                  # "" = system default voice
 TEXT="touch"                                     # "" = no speech
-COOLDOWN=5                                       # seconds between alerts
+COOLDOWN=5                                       # seconds between repeated alerts
+MAX_ALERTS=3                                     # most alerts per touch request
+BLINKS_BEFORE_ALERT=3                            # blinks before the first alert, 1 = at once
 ```
 
 Changes apply on the next touch request. **No restart is needed.** To hear your change right away:
@@ -178,7 +185,7 @@ Your config is kept. To remove it too, run `./uninstall.sh --purge` from a clone
 ## Troubleshooting
 
 **No alert when the key blinks.**
-Check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
+The first alert comes on the 3rd blink. If you touch the key sooner, silence is expected. Set `BLINKS_BEFORE_ALERT=1` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
 
 **The key never asks for a touch.**
 Your OpenPGP touch policy may be off. Check it with `ykman openpgp info`. To require a touch for SSH authentication, run `ykman openpgp keys set-touch aut on`.
@@ -188,6 +195,9 @@ Another copy of yknotify is running. It may be a manual run in a terminal or an 
 
 **Config or script changes seem to have no effect.**
 The alert you hear may come from a different notifier. Run the checks in [Make sure only one notifier is running](#make-sure-only-one-notifier-is-running).
+
+**Endless alerts, or many `say` processes and high CPU.**
+This happened with older versions when yknotify got stuck reporting a touch. Update by running the install command again. Then clear leftovers with `pkill -x say`. The log shows `restarting it` whenever the new safety limit kicks in.
 
 **An occasional alert with no touch request.**
 yknotify detects touch requests from macOS log messages. It can sometimes misread one. A macOS update could also change those messages and break detection. If that happens, check [yknotify](https://github.com/noperator/yknotify) for a fix.
