@@ -111,6 +111,8 @@ plutil -lint -s "$PLIST"
 
 DOMAIN="gui/$(id -u)"
 launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+# A label disabled with `launchctl disable` refuses to bootstrap, even from a fresh plist.
+launchctl enable "$DOMAIN/$LABEL"
 # bootout finishes asynchronously, so an immediate bootstrap can fail.
 for attempt in 1 2 3 4 5; do
   if launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null; then

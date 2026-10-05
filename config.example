@@ -13,5 +13,8 @@ VOICE="Whisper"
 # Text spoken after the sound. Set to "" for no speech.
 TEXT="touch"
 
-# Minimum seconds between two alerts.
+# Seconds between repeated alerts while the key keeps waiting.
 COOLDOWN=5
+
+# Most alerts played for one touch request.
+MAX_ALERTS=3

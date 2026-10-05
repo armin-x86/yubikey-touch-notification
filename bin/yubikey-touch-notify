@@ -5,26 +5,57 @@
 CONFIG="${YUBIKEY_TOUCH_CONFIG:-$HOME/.config/yubikey-touch-notification/config}"
 YKNOTIFY="${YKNOTIFY:-$HOME/.local/bin/yknotify}"
 
+# yknotify repeats its event every second while a touch is pending.
+# A pause longer than EVENT_GAP means that touch request is over.
+EVENT_GAP=3
+# yknotify only clears its pending flag when a later log line says so. If that
+# line never comes, it reports a touch forever. No real touch prompt lasts this
+# long, so we exit and let launchd restart yknotify with a clean state.
+STUCK_AFTER=60
+# afplay and say can hang when coreaudiod is busy. Without a limit they pile up.
+ALERT_TIMEOUT=10
+
 load_config() {
   SOUND="/System/Library/Sounds/Submarine.aiff"
   VOICE="Whisper"
   TEXT="touch"
   COOLDOWN=5
+  MAX_ALERTS=3
   # shellcheck source=/dev/null
   [[ -r "$CONFIG" ]] && source "$CONFIG"
 }
 
+with_timeout() {
+  local seconds="$1"
+  shift
+  /usr/bin/perl -e 'alarm shift; exec @ARGV or die "$!\n"' "$seconds" "$@"
+}
+
 alert() {
   if [[ -n "$SOUND" ]]; then
-    /usr/bin/afplay "$SOUND"
+    with_timeout "$ALERT_TIMEOUT" /usr/bin/afplay "$SOUND"
   fi
   if [[ -n "$TEXT" ]]; then
     if [[ -n "$VOICE" ]]; then
-      /usr/bin/say -v "$VOICE" "$TEXT"
+      with_timeout "$ALERT_TIMEOUT" /usr/bin/say -v "$VOICE" "$TEXT"
     else
-      /usr/bin/say "$TEXT"
+      with_timeout "$ALERT_TIMEOUT" /usr/bin/say "$TEXT"
     fi
   fi
+}
+
+alert_pid=""
+alert_in_background() {
+  # Never stack a new alert on top of one that is still playing.
+  if [[ -n "$alert_pid" ]] && kill -0 "$alert_pid" 2>/dev/null; then
+    return
+  fi
+  alert >/dev/null 2>&1 &
+  alert_pid=$!
+}
+
+log() {
+  echo "$(date '+%F %T') $*"
 }
 
 case "${1:-}" in
@@ -47,14 +78,38 @@ if [[ ! -x "$YKNOTIFY" ]]; then
   exit 1
 fi
 
-last=0
-"$YKNOTIFY" | while read -r event; do
+# yknotify leaves its `log stream` child behind when it dies, so take down the
+# whole process group on the way out.
+trap 'trap "" TERM; kill -TERM 0 2>/dev/null' EXIT
+
+last_event=-1000
+request_start=0
+last_alert=0
+alerts=0
+
+while read -r event; do
   # Reloaded on every event so config edits apply without a restart.
   load_config
-  now=$(date +%s)
-  if (( now - last >= COOLDOWN )); then
-    last=$now
-    echo "$(date '+%F %T') $event"
-    alert >/dev/null 2>&1 &
+  now=$SECONDS
+
+  if (( now - last_event > EVENT_GAP )); then
+    request_start=$now
+    alerts=0
+    log "touch requested $event"
   fi
-done
+  last_event=$now
+
+  if (( now - request_start >= STUCK_AFTER )); then
+    log "yknotify reported a touch for ${STUCK_AFTER}s straight, restarting it"
+    exit 75
+  fi
+
+  if (( alerts == 0 || (alerts < MAX_ALERTS && now - last_alert >= COOLDOWN) )); then
+    alerts=$((alerts + 1))
+    last_alert=$now
+    alert_in_background
+  fi
+done < <("$YKNOTIFY")
+
+log "yknotify exited, restarting"
+exit 1

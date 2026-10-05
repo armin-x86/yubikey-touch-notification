@@ -36,8 +36,13 @@ macOS unified log ──> yknotify ──> yubikey-touch-notify ──> afplay +
 ```
 
 1. [yknotify](https://github.com/noperator/yknotify) streams the macOS system log and prints a line when a YubiKey starts waiting for a touch.
-2. `yubikey-touch-notify` reads those lines and plays your sound and voice. It waits `COOLDOWN` seconds between alerts so one touch gives one alert.
+2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. So the notifier alerts right away, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`.
 3. A per-user LaunchAgent keeps it running. It starts at login and restarts if it ever exits.
+
+Safety limits keep it quiet and light when something goes wrong:
+
+- Only one alert plays at a time. Each `afplay` or `say` is killed after 10 seconds, so hung audio can never pile up.
+- yknotify can get stuck reporting a touch that is long over. If it reports one for 60 seconds straight, the notifier exits and launchd restarts it with a clean state.
 
 No root access is needed. Everything is installed in your home folder:
 
@@ -61,7 +66,8 @@ open -e ~/.config/yubikey-touch-notification/config
 SOUND="/System/Library/Sounds/Submarine.aiff"   # "" = no sound
 VOICE="Whisper"                                  # "" = system default voice
 TEXT="touch"                                     # "" = no speech
-COOLDOWN=5                                       # seconds between alerts
+COOLDOWN=5                                       # seconds between repeated alerts
+MAX_ALERTS=3                                     # most alerts per touch request
 ```
 
 Changes apply on the next touch request. **No restart is needed.** To hear your change right away:
@@ -188,6 +194,9 @@ Another copy of yknotify is running. It may be a manual run in a terminal or an 
 
 **Config or script changes seem to have no effect.**
 The alert you hear may come from a different notifier. Run the checks in [Make sure only one notifier is running](#make-sure-only-one-notifier-is-running).
+
+**Endless alerts, or many `say` processes and high CPU.**
+This happened with older versions when yknotify got stuck reporting a touch. Update by running the install command again. Then clear leftovers with `pkill -x say`. The log shows `restarting it` whenever the new safety limit kicks in.
 
 **An occasional alert with no touch request.**
 yknotify detects touch requests from macOS log messages. It can sometimes misread one. A macOS update could also change those messages and break detection. If that happens, check [yknotify](https://github.com/noperator/yknotify) for a fix.
