@@ -7,7 +7,7 @@ It works for YubiKey touch requests that macOS logs:
 - **OpenPGP** (for example SSH through `gpg-agent`, `git` commit signing, `gpg --decrypt`). On by default.
 - **FIDO2 / WebAuthn** (for example `ssh` with `ed25519-sk` keys, browser security-key prompts). Off by default. See [FIDO2 alerts](#fido2-alerts).
 
-By default you hear the macOS "Submarine" sound followed by a whispered "touch" once the key has blinked 3 times without a touch.
+By default you hear the macOS "Submarine" sound followed by a whispered "touch" once the key has blinked for 5 seconds without a touch.
 
 ## Install
 
@@ -36,7 +36,7 @@ macOS unified log ──> yknotify ──> yubikey-touch-notify ──> afplay +
 ```
 
 1. [yknotify](https://github.com/noperator/yknotify) streams the macOS system log and prints a line when a YubiKey starts waiting for a touch.
-2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. The notifier counts those lines as blinks. It alerts on blink `BLINKS_BEFORE_ALERT`, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`. Touch the key before that and you hear nothing.
+2. `yubikey-touch-notify` reads those lines and plays your sound and voice. yknotify repeats its line every second while the key waits. The notifier alerts once the key has waited `SILENT_SECONDS`, repeats every `COOLDOWN` seconds, and stops after `MAX_ALERTS`. Touch the key before that and you hear nothing.
 3. A per-user LaunchAgent keeps it running. It starts at login and restarts if it ever exits.
 
 Safety limits keep it quiet and light when something goes wrong:
@@ -68,7 +68,7 @@ VOICE="Whisper"                                  # "" = system default voice
 TEXT="touch"                                     # "" = no speech
 COOLDOWN=5                                       # seconds between repeated alerts
 MAX_ALERTS=3                                     # most alerts per touch request
-BLINKS_BEFORE_ALERT=3                            # blinks before the first alert, 1 = at once
+SILENT_SECONDS=5                                 # seconds of blinking before the first alert, 0 = at once
 TYPES="OpenPGP"                                  # touch types to alert on: OpenPGP, FIDO2
 ```
 
@@ -196,7 +196,7 @@ Your config is kept. To remove it too, run `./uninstall.sh --purge` from a clone
 ## Troubleshooting
 
 **No alert when the key blinks.**
-FIDO2 requests (browser prompts, `ed25519-sk` SSH keys) are ignored unless `TYPES` includes `FIDO2`. See [FIDO2 alerts](#fido2-alerts). The first alert comes on the 3rd blink. If you touch the key sooner, silence is expected. Set `BLINKS_BEFORE_ALERT=1` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
+FIDO2 requests (browser prompts, `ed25519-sk` SSH keys) are ignored unless `TYPES` includes `FIDO2`. See [FIDO2 alerts](#fido2-alerts). The first alert comes after 5 seconds of blinking. If you touch the key sooner, silence is expected. Set `SILENT_SECONDS=0` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
 
 **The key never asks for a touch.**
 Your OpenPGP touch policy may be off. Check it with `ykman openpgp info`. To require a touch for SSH authentication, run `ykman openpgp keys set-touch aut on`.
