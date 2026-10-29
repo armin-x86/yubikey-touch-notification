@@ -21,7 +21,7 @@ load_config() {
   TEXT="touch"
   COOLDOWN=5
   MAX_ALERTS=3
-  BLINKS_BEFORE_ALERT=3
+  SILENT_SECONDS=5
   TYPES="OpenPGP"
   # shellcheck source=/dev/null
   [[ -r "$CONFIG" ]] && source "$CONFIG"
@@ -112,7 +112,9 @@ while read -r event; do
     exit 75
   fi
 
-  (( blinks < BLINKS_BEFORE_ALERT )) && continue
+  # yknotify prints at most one event per second and stops as soon as the key
+  # is touched, so event N+1 proves the key blinked untouched for N seconds.
+  (( blinks <= SILENT_SECONDS )) && continue
 
   if (( alerts == 0 || (alerts < MAX_ALERTS && now - last_alert >= COOLDOWN) )); then
     alerts=$((alerts + 1))
