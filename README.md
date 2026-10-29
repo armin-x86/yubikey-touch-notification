@@ -2,10 +2,10 @@
 
 **macOS only.** Plays a sound and speaks a word when your YubiKey keeps waiting for a touch, so you never miss the blinking key.
 
-It works for any YubiKey touch request that macOS logs:
+It works for YubiKey touch requests that macOS logs:
 
-- **OpenPGP** (for example SSH through `gpg-agent`, `git` commit signing, `gpg --decrypt`)
-- **FIDO2 / WebAuthn** (for example `ssh` with `ed25519-sk` keys, browser security-key prompts)
+- **OpenPGP** (for example SSH through `gpg-agent`, `git` commit signing, `gpg --decrypt`). On by default.
+- **FIDO2 / WebAuthn** (for example `ssh` with `ed25519-sk` keys, browser security-key prompts). Off by default. See [FIDO2 alerts](#fido2-alerts).
 
 By default you hear the macOS "Submarine" sound followed by a whispered "touch" once the key has blinked 3 times without a touch.
 
@@ -69,6 +69,7 @@ TEXT="touch"                                     # "" = no speech
 COOLDOWN=5                                       # seconds between repeated alerts
 MAX_ALERTS=3                                     # most alerts per touch request
 BLINKS_BEFORE_ALERT=3                            # blinks before the first alert, 1 = at once
+TYPES="OpenPGP"                                  # touch types to alert on: OpenPGP, FIDO2
 ```
 
 Changes apply on the next touch request. **No restart is needed.** To hear your change right away:
@@ -107,6 +108,16 @@ TEXT=""
 SOUND=""
 VOICE="Samantha"
 TEXT="Touch your YubiKey"
+```
+
+### FIDO2 alerts
+
+FIDO2 alerts are off by default because their detection is unreliable. yknotify treats any USB HID device that macOS opens as a possible YubiKey. Plugging in or unplugging a monitor such as the Apple Studio Display, a dock or a keyboard can then sound an alert with no touch request. These false alerts also never clear on their own, so the log shows `restarting it` after 60 seconds.
+
+To alert on FIDO2 too, accepting those false alerts:
+
+```sh
+TYPES="OpenPGP FIDO2"
 ```
 
 ## Manage the service
@@ -185,7 +196,7 @@ Your config is kept. To remove it too, run `./uninstall.sh --purge` from a clone
 ## Troubleshooting
 
 **No alert when the key blinks.**
-The first alert comes on the 3rd blink. If you touch the key sooner, silence is expected. Set `BLINKS_BEFORE_ALERT=1` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
+FIDO2 requests (browser prompts, `ed25519-sk` SSH keys) are ignored unless `TYPES` includes `FIDO2`. See [FIDO2 alerts](#fido2-alerts). The first alert comes on the 3rd blink. If you touch the key sooner, silence is expected. Set `BLINKS_BEFORE_ALERT=1` to alert at once. Otherwise check the log with `tail ~/Library/Logs/yubikey-touch-notification.log`. If nothing shows up when the key blinks, check the service status (see above).
 
 **The key never asks for a touch.**
 Your OpenPGP touch policy may be off. Check it with `ykman openpgp info`. To require a touch for SSH authentication, run `ykman openpgp keys set-touch aut on`.
@@ -200,7 +211,7 @@ The alert you hear may come from a different notifier. Run the checks in [Make s
 This happened with older versions when yknotify got stuck reporting a touch. Update by running the install command again. Then clear leftovers with `pkill -x say`. The log shows `restarting it` whenever the new safety limit kicks in.
 
 **An occasional alert with no touch request.**
-yknotify detects touch requests from macOS log messages. It can sometimes misread one. A macOS update could also change those messages and break detection. If that happens, check [yknotify](https://github.com/noperator/yknotify) for a fix.
+If it happens when you connect or disconnect a USB device, it is a FIDO2 false alert. Remove `FIDO2` from `TYPES`. Otherwise: yknotify detects touch requests from macOS log messages. It can sometimes misread one. A macOS update could also change those messages and break detection. If that happens, check [yknotify](https://github.com/noperator/yknotify) for a fix.
 
 ## Credits
 
